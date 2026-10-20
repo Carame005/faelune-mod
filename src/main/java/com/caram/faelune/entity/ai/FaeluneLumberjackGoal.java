@@ -6,9 +6,7 @@ import com.caram.faelune.work.WorkTask;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,8 +62,6 @@ public class FaeluneLumberjackGoal extends FaeluneBlockWorkGoal {
     private @Nullable BlockPos lastChopBase;
     private int trimsLeft;
     private int trimFeetY;
-    /** Stump position -> sapling that tree needs (AIR while still unknown). */
-    private final Map<BlockPos, Item> pendingReplant = new HashMap<>();
     private final List<BlockPos> fellingStumps = new ArrayList<>();
     private boolean fellingSaplingFromLeaves;
     private final Set<BlockPos> currentTree = new LinkedHashSet<>();
@@ -207,9 +203,13 @@ public class FaeluneLumberjackGoal extends FaeluneBlockWorkGoal {
         return switch (this.mode) {
             case CHOP -> level.getBlockState(pos).is(BlockTags.LOGS);
             case FELL -> true;
-            case PLANT -> this.pendingReplant.containsKey(pos)
-                    && level.getBlockState(pos).canBeReplaced()
-                    && this.findSaplingSlot(this.pendingReplant.get(pos)) >= 0;
+            case PLANT -> {
+                StellarBeaconBlockEntity station = this.faelune.getStation();
+                Item wanted = station == null ? null : station.getPendingReplant(pos);
+                yield wanted != null
+                        && level.getBlockState(pos).canBeReplaced()
+                        && this.findSaplingSlot(wanted) >= 0;
+            }
             case TRIM -> isNaturalLeaves(level.getBlockState(pos));
         };
     }
@@ -327,10 +327,11 @@ public class FaeluneLumberjackGoal extends FaeluneBlockWorkGoal {
         this.fellingSaplingFromLeaves = false;
         Item guessed = saplingForLog(level.getBlockState(logs.getFirst()));
         BlockState probe = (guessed == Items.AIR ? Blocks.OAK_SAPLING : Block.byItem(guessed)).defaultBlockState();
+        StellarBeaconBlockEntity station = this.faelune.getStation();
         for (BlockPos log : logs) {
             // Saplings only look at the block below, so this works while the log is still standing.
-            if (!level.getBlockState(log.below()).is(BlockTags.LOGS) && probe.canSurvive(level, log)) {
-                this.pendingReplant.put(log, guessed);
+            if (station != null && !level.getBlockState(log.below()).is(BlockTags.LOGS) && probe.canSurvive(level, log)) {
+                station.addPendingReplant(log, guessed);
                 this.fellingStumps.add(log);
             }
         }
@@ -473,14 +474,15 @@ public class FaeluneLumberjackGoal extends FaeluneBlockWorkGoal {
 
     /** The tree's own leaves are the most reliable source (azaleas, for example, grow on oak logs). */
     private void learnSaplingFromLeaves(List<ItemStack> drops) {
-        if (this.fellingSaplingFromLeaves || this.fellingStumps.isEmpty()) {
+        StellarBeaconBlockEntity station = this.faelune.getStation();
+        if (this.fellingSaplingFromLeaves || this.fellingStumps.isEmpty() || station == null) {
             return;
         }
         for (ItemStack drop : drops) {
             if (WorkTask.isSapling(drop)) {
                 this.fellingSaplingFromLeaves = true;
                 for (BlockPos stump : this.fellingStumps) {
-                    this.pendingReplant.computeIfPresent(stump, (pos, old) -> drop.getItem());
+                    station.setPendingReplantSapling(stump, drop.getItem());
                 }
                 return;
             }
@@ -518,11 +520,17 @@ public class FaeluneLumberjackGoal extends FaeluneBlockWorkGoal {
     }
 
     private boolean plant(ServerLevel level, BlockPos pos) {
-        Item wanted = this.pendingReplant.remove(pos);
-        int slot = this.findSaplingSlot(wanted);
-        if (slot < 0) {
+        StellarBeaconBlockEntity station = this.faelune.getStation();
+        Item wanted = station == null ? null : station.getPendingReplant(pos);
+        if (wanted == null) {
             return true;
         }
+        int slot = this.findSaplingSlot(wanted);
+        if (slot < 0) {
+            // Leave the stump pending for a coworker that does carry the sapling.
+            return true;
+        }
+        station.removePendingReplant(pos);
 
         ItemStack sapling = this.faelune.getInventory().getItem(slot);
         BlockState saplingState = Block.byItem(sapling.getItem()).defaultBlockState();
@@ -537,17 +545,15 @@ public class FaeluneLumberjackGoal extends FaeluneBlockWorkGoal {
     }
 
     private @Nullable BlockPos findReplantSpot(ServerLevel level, StellarBeaconBlockEntity station) {
-        if (this.pendingReplant.isEmpty()) {
+        if (station.getPendingReplants().isEmpty()) {
             return null;
         }
         BlockPos best = null;
         double bestDist = Double.MAX_VALUE;
-        Iterator<Map.Entry<BlockPos, Item>> it = this.pendingReplant.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<BlockPos, Item> entry = it.next();
+        for (Map.Entry<BlockPos, Item> entry : List.copyOf(station.getPendingReplants().entrySet())) {
             BlockPos pos = entry.getKey();
             if (!station.isInWorkArea(pos) || !level.getBlockState(pos).canBeReplaced()) {
-                it.remove();
+                station.removePendingReplant(pos);
                 continue;
             }
             if (this.isIgnored(pos)) {

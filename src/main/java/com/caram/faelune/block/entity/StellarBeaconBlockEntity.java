@@ -4,9 +4,15 @@ import com.caram.faelune.entity.FaeluneEntity;
 import com.caram.faelune.menu.StellarBeaconMenu;
 import com.caram.faelune.registry.ModBlockEntities;
 import com.caram.faelune.work.WorkTask;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -14,6 +20,7 @@ import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
@@ -21,6 +28,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
+import org.jspecify.annotations.Nullable;
 
 public class StellarBeaconBlockEntity extends BaseContainerBlockEntity {
     public static final int CONTAINER_SIZE = 27;
@@ -43,6 +51,8 @@ public class StellarBeaconBlockEntity extends BaseContainerBlockEntity {
     private int radius = DEFAULT_RADIUS;
     private int linkedCount;
     private int missingToolCount;
+    /** Stumps of felled trees waiting for a sapling (AIR while its type is unknown), shared by every lumberjack. */
+    private final Map<BlockPos, Item> pendingReplants = new HashMap<>();
 
     private final ContainerData dataAccess = new ContainerData() {
         @Override
@@ -149,6 +159,32 @@ public class StellarBeaconBlockEntity extends BaseContainerBlockEntity {
                 && target.getY() <= pos.getY() + 15;
     }
 
+    public Map<BlockPos, Item> getPendingReplants() {
+        return Collections.unmodifiableMap(this.pendingReplants);
+    }
+
+    public @Nullable Item getPendingReplant(BlockPos pos) {
+        return this.pendingReplants.get(pos);
+    }
+
+    public void addPendingReplant(BlockPos pos, Item sapling) {
+        this.pendingReplants.put(pos.immutable(), sapling);
+        this.setChanged();
+    }
+
+    /** Only updates stumps that are still pending. */
+    public void setPendingReplantSapling(BlockPos pos, Item sapling) {
+        if (this.pendingReplants.computeIfPresent(pos, (key, old) -> sapling) != null) {
+            this.setChanged();
+        }
+    }
+
+    public void removePendingReplant(BlockPos pos) {
+        if (this.pendingReplants.remove(pos) != null) {
+            this.setChanged();
+        }
+    }
+
     /** Inserts into the beacon storage. Returns the leftover stack. */
     public ItemStack insert(ItemStack stack) {
         ItemStack remaining = stack.copy();
@@ -180,6 +216,8 @@ public class StellarBeaconBlockEntity extends BaseContainerBlockEntity {
         ContainerHelper.saveAllItems(output, this.items);
         output.putInt("Task", this.task.id());
         output.putInt("Radius", this.radius);
+        ValueOutput.TypedOutputList<PendingReplant> replants = output.list("PendingReplants", PendingReplant.CODEC);
+        this.pendingReplants.forEach((pos, sapling) -> replants.add(new PendingReplant(pos, sapling)));
     }
 
     @Override
@@ -189,6 +227,17 @@ public class StellarBeaconBlockEntity extends BaseContainerBlockEntity {
         ContainerHelper.loadAllItems(input, this.items);
         this.task = WorkTask.byId(input.getIntOr("Task", 0));
         this.radius = Mth.clamp(input.getIntOr("Radius", DEFAULT_RADIUS), MIN_RADIUS, MAX_RADIUS);
+        this.pendingReplants.clear();
+        for (PendingReplant replant : input.listOrEmpty("PendingReplants", PendingReplant.CODEC)) {
+            this.pendingReplants.put(replant.pos(), replant.sapling());
+        }
+    }
+
+    private record PendingReplant(BlockPos pos, Item sapling) {
+        static final Codec<PendingReplant> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                BlockPos.CODEC.fieldOf("pos").forGetter(PendingReplant::pos),
+                BuiltInRegistries.ITEM.byNameCodec().fieldOf("sapling").forGetter(PendingReplant::sapling)
+        ).apply(instance, PendingReplant::new));
     }
 
     @Override
