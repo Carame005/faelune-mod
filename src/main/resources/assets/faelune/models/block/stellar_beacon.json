@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "faelune:block/stellar_beacon_top",
+    "bottom": "faelune:block/stellar_beacon_bottom",
+    "side": "faelune:block/stellar_beacon_side"
+  }
+}

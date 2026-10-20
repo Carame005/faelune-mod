@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:cookie",
+    "minecraft:glowstone_dust",
+    "minecraft:amethyst_shard"
+  ],
+  "result": {
+    "id": "faelune:stellar_cookie",
+    "count": 1
+  }
+}

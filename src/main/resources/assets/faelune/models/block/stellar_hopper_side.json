@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/hopper_side",
+  "textures": {
+    "particle": "faelune:block/stellar_hopper_outside",
+    "top": "faelune:block/stellar_hopper_top",
+    "side": "faelune:block/stellar_hopper_outside",
+    "inside": "faelune:block/stellar_hopper_inside"
+  }
+}

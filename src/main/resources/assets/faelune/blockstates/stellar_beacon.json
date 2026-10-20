@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "faelune:block/stellar_beacon" }
+  }
+}

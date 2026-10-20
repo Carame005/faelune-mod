@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    " G ",
+    "AHA",
+    " A "
+  ],
+  "key": {
+    "G": "minecraft:glowstone_dust",
+    "A": "minecraft:amethyst_shard",
+    "H": "minecraft:hopper"
+  },
+  "result": {
+    "id": "faelune:stellar_hopper",
+    "count": 1
+  }
+}

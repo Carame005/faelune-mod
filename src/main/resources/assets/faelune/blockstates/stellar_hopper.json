@@ -1,0 +1,9 @@
+{
+  "variants": {
+    "facing=down": { "model": "faelune:block/stellar_hopper" },
+    "facing=north": { "model": "faelune:block/stellar_hopper_side" },
+    "facing=east": { "model": "faelune:block/stellar_hopper_side", "y": 90 },
+    "facing=south": { "model": "faelune:block/stellar_hopper_side", "y": 180 },
+    "facing=west": { "model": "faelune:block/stellar_hopper_side", "y": 270 }
+  }
+}

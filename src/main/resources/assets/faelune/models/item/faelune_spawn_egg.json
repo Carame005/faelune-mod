@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "faelune:item/faelune_spawn_egg"
+  }
+}

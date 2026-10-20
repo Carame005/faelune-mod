@@ -1,0 +1,31 @@
+modLoader="javafml"
+loaderVersion="[64,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="faelune"
+version="1.0.0"
+displayName="Faelune"
+authors="caram"
+description='''Adds Faelune, a tameable GeckoLib companion mob.'''
+
+[[dependencies.faelune]]
+    modId="forge"
+    mandatory=true
+    versionRange="[64,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.faelune]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[26.1.2,26.2,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.faelune]]
+    modId="geckolib"
+    mandatory=true
+    versionRange="[5.5,)"
+    ordering="NONE"
+    side="BOTH"

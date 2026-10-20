@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "faelune:block/stellar_beacon"
+  }
+}
